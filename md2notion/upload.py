@@ -5,10 +5,11 @@ import glob
 import argparse
 import sys
 import re
-from pathlib import Path
+from pathlib import Path, PurePath
+import humanize
 from urllib.parse import unquote, urlparse, ParseResult
 import mistletoe
-from notion.block import EmbedOrUploadBlock, CollectionViewBlock, PageBlock
+from notion.block import EmbedOrUploadBlock, CollectionViewBlock, PageBlock, TextBlock, FileBlock
 from notion.client import NotionClient
 from .NotionPyRenderer import NotionPyRenderer, addHtmlImgTagExtension, addLatexExtension
 
@@ -69,7 +70,24 @@ def uploadBlock(blockDescriptor, blockParent, mdFilePath, imagePathFunc=None):
     if "children" in blockDescriptor:
         blockChildren = blockDescriptor["children"]
         del blockDescriptor["children"]
-    newBlock = blockParent.children.add_new(blockClass, **blockDescriptor)
+
+    # check if a local link only TextBlock first
+    if issubclass(blockClass, TextBlock):
+        title = blockDescriptor["title"]
+        m = re.search(r"^\[.+\]\((.\/.+)\)$", title)
+        if m:
+            fileSrc = relativePathForMarkdownUrl(m.group(1), mdFilePath)
+            newBlock = blockParent.children.add_new(FileBlock)
+            newBlock.title = PurePath(fileSrc).name
+            newBlock.size = humanize.naturalsize(Path(fileSrc).stat().st_size)
+            print(f"Uploading file '{fileSrc}'")
+            newBlock.upload_file(str(fileSrc))
+
+    try:
+        newBlock
+    except NameError:
+        newBlock = blockParent.children.add_new(blockClass, **blockDescriptor)
+
     # Upload images to Notion.so that have local file paths
     # most of the time, this will be a standard ImageBlock; however some markdown
     # generators use the image syntax for general purpose "embedded" files; hence we
@@ -144,7 +162,7 @@ def upload(mdFile, notionPage, imagePathFunc=None, notionPyRendererCls=NotionPyR
 
 def filesFromPathsUrls(paths):
     """
-    Takes paths or URLs and yields file (path, fileName, file) tuples for 
+    Takes paths or URLs and yields file (path, fileName, file) tuples for
     them
     """
     for path in paths:

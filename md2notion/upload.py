@@ -9,7 +9,7 @@ from pathlib import Path, PurePath
 import humanize
 from urllib.parse import unquote, urlparse, ParseResult
 import mistletoe
-from notion.block import EmbedOrUploadBlock, CollectionViewBlock, PageBlock, TextBlock, FileBlock
+from notion.block import EmbedOrUploadBlock, CollectionViewBlock, PageBlock, TextBlock, FileBlock, HeaderBlock
 from notion.client import NotionClient
 from .NotionPyRenderer import NotionPyRenderer, addHtmlImgTagExtension, addLatexExtension
 
@@ -70,6 +70,13 @@ def uploadBlock(blockDescriptor, blockParent, mdFilePath, imagePathFunc=None):
     if "children" in blockDescriptor:
         blockChildren = blockDescriptor["children"]
         del blockDescriptor["children"]
+
+    if issubclass(blockClass, HeaderBlock):
+        # only PageBlock has 'id' attr??
+        if hasattr(blockParent, 'id'):
+            # set header 1 as page title
+            blockParent.title = blockDescriptor["title"]
+            newBlock = None
 
     # check if a local link only TextBlock first
     if issubclass(blockClass, TextBlock):

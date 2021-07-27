@@ -183,7 +183,7 @@ def filesFromPathsUrls(paths):
             fileLike.name = path
             yield (path, fileName, fileLike)
         else:
-            globPaths = glob.glob(path, recursive=True)
+            globPaths = glob.glob(glob.escape(path), recursive=True)
             if not globPaths:
                 raise RuntimeError(f'No file found for glob {path}')
             for path in globPaths:
